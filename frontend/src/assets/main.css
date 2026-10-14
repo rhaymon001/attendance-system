@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  /* Primary action colour — used for buttons, links, focus rings */
+  --color-primary: #2563EB;
+  --color-primary-dark: #1D4ED8;
+
+  /* Attendance status colours */
+  --color-present: #16A34A;
+  --color-rejected: #DC2626;
+  --color-rejected-dark: #B91C1C;
+  --color-warning: #D97706;
+
+  /* Surface colours */
+  --color-sidebar: #111827;
+  --color-sidebar-hover: #1F2937;
+
+  /* Text colours */
+  --color-text-primary: #111827;
+  --color-text-secondary: #6B7280;
+  --color-text-placeholder: #9CA3AF;
+
+  /* Border */
+  --color-border: #E5E7EB;
+  --color-border-subtle: #F3F4F6;
+
+  /* Font */
+  --font-sans: 'Inter', sans-serif;
+}
