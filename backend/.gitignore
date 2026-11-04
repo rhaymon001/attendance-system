@@ -5,3 +5,9 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Local test/import data
+/test-data/
+
+# Local-only demo accounts and seed data
+/scripts/seedTestData.js
