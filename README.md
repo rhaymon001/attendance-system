@@ -86,6 +86,8 @@ The same QR token can be used by eligible students during its two-minute lifetim
 attendance-system/
 ├── backend/       Express API, models, controllers, routes, and Jest tests
 ├── frontend/      Vue application and PWA configuration
+├── docs/          Project instructions and supporting documentation
+├── SYSTEM_STRUCTURE.md
 ├── README.md
 └── .gitignore
 ```
