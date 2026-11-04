@@ -1,5 +1,50 @@
 <template>
   <div class="w-full space-y-6">
+      <section v-if="!session" class="max-w-2xl mx-auto w-full bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <div class="mb-6">
+          <p class="text-xs font-semibold text-primary uppercase tracking-wider">Lecturer Portal</p>
+          <h1 class="mt-1 text-2xl font-bold text-gray-900">Start a class session</h1>
+          <p class="mt-2 text-sm text-gray-500">Choose where this class is meeting. Check-ins will be validated against that venue's geofence.</p>
+        </div>
+
+        <label for="session-venue" class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+          Session venue
+        </label>
+        <select
+          id="session-venue"
+          v-model="selectedVenueId"
+          class="w-full h-11 px-3 rounded-lg bg-white border border-gray-200 text-gray-900 text-sm outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-50"
+          :disabled="isLoadingVenues || isStartingSession || venues.length === 0"
+        >
+          <option value="" disabled>
+            {{ isLoadingVenues ? 'Loading venues...' : 'Select a venue' }}
+          </option>
+          <option v-for="venue in venues" :key="venue._id" :value="venue._id">
+            {{ venue.name }}{{ venue.building ? ` — ${venue.building}` : '' }} ({{ venue.radiusMetres || 50 }}m radius)
+          </option>
+        </select>
+
+        <p v-if="selectedVenue" class="mt-2 text-xs text-gray-500">
+          Geofence center: {{ selectedVenue.lat }}, {{ selectedVenue.lng }}
+        </p>
+        <p v-if="sessionError" role="alert" class="mt-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+          {{ sessionError }}
+        </p>
+
+        <div class="mt-6 flex justify-end">
+          <button
+            type="button"
+            class="h-10 px-4 rounded-lg bg-primary hover:bg-blue-700 text-white text-sm font-medium shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="isLoadingVenues || isStartingSession || !selectedVenueId"
+            @click="startSession"
+          >
+            <span v-if="isStartingSession" class="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+            <span>{{ isStartingSession ? 'Starting...' : 'Start Session' }}</span>
+          </button>
+        </div>
+      </section>
+
+      <template v-else>
     <!-- Page Top Bar & Context Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div class="flex flex-col gap-1">
@@ -303,6 +348,7 @@
         </button>
       </template>
     </AppModal>
+    </template>
   </div>
 </template>
 
@@ -324,6 +370,11 @@ const { join, onAttendanceNew } = useSocket()
 
 // State
 const session = ref(null)
+const venues = ref([])
+const selectedVenueId = ref('')
+const isLoadingVenues = ref(true)
+const isStartingSession = ref(false)
+const sessionError = ref('')
 const qrToken = ref('')
 const attendees = ref([])
 const searchQuery = ref('')
@@ -335,6 +386,10 @@ let timerInterval = null
 
 // Computed properties
 const courseId = computed(() => route.params.courseId || route.params.id)
+
+const selectedVenue = computed(() =>
+  venues.value.find((venue) => venue._id === selectedVenueId.value) || null
+)
 
 const courseTitle = computed(() => {
   if (!session.value) return 'Course Session Broadcast'
@@ -433,22 +488,37 @@ const refreshQR = async () => {
   }
 }
 
-// Init Session
-const initSession = async () => {
+const loadVenues = async () => {
+  isLoadingVenues.value = true
+  sessionError.value = ''
   try {
     const venuesResponse = await api.get('/api/lecturer/venues')
     const venuesData = venuesResponse.data?.data || venuesResponse.data?.venues || venuesResponse.data || []
-    const venues = Array.isArray(venuesData) ? venuesData : []
-    const requestedVenueId = route.query.venueId
-    const selectedVenue = venues.find((venue) => venue._id === requestedVenueId) || venues[0]
+    venues.value = Array.isArray(venuesData) ? venuesData : []
+    const requestedVenueId = String(route.query.venueId || '')
+    selectedVenueId.value = venues.value.some((venue) => venue._id === requestedVenueId)
+      ? requestedVenueId
+      : venues.value[0]?._id || ''
 
-    if (!selectedVenue) {
-      throw new Error('No venue is configured. Ask an administrator to add a venue before starting a session.')
+    if (venues.value.length === 0) {
+      sessionError.value = 'No venue is configured. Ask an administrator to add a venue before starting a session.'
     }
+  } catch (err) {
+    console.error('Failed to load venues:', err)
+    sessionError.value = err.response?.data?.message || 'Could not load venues. Please try again.'
+  } finally {
+    isLoadingVenues.value = false
+  }
+}
 
+const startSession = async () => {
+  if (!selectedVenueId.value || isStartingSession.value) return
+  isStartingSession.value = true
+  sessionError.value = ''
+  try {
     const res = await api.post('/api/sessions', {
       courseId: courseId.value,
-      venueId: selectedVenue._id
+      venueId: selectedVenueId.value
     })
     const data = res.data?.data || res.data || {}
     session.value = data.session || data
@@ -475,6 +545,9 @@ const initSession = async () => {
     startTimer()
   } catch (err) {
     console.error('Failed to initialize session:', err)
+    sessionError.value = err.response?.data?.message || 'Could not start the session. Please try again.'
+  } finally {
+    isStartingSession.value = false
   }
 }
 
@@ -495,7 +568,7 @@ const endSession = async () => {
 }
 
 onMounted(() => {
-  initSession()
+  loadVenues()
 
   // Real-time listener for incoming student check-ins
   onAttendanceNew((record) => {
